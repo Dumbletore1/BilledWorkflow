@@ -1,22 +1,3 @@
-<#
-.SYNOPSIS
-  Kopierer billeder fra brugeres mobil-backupmapper til J-drevet med datostruktur.
-
-.DESCRIPTION
-  Scriptet håndterer flere brugere og flere devices pr. bruger. Den scanner automatisk:
-    \\torenas\homes\<bruger>\Photos\MobileBackup\<device>\DCIM\Camera\<år>
-
-  Filer kopieres til:
-    J:\Pictures\<år>\<dato>\fil.jpg
-
-.PARAMETER Execute
-  Udfører reelle handlinger: kopierer filer og opretter mapper.
-  Uden parameter køres scriptet som tørkørsel.
-
-.EXAMPLE
-  .\MultiUserWorkflow.ps1 -Execute
-#>
-
 param (
     [switch]$Execute
 )
@@ -29,10 +10,20 @@ $logFile          = "$PSScriptRoot\LastRun.log"
 
 # === Logfunktion ===
 function Log {
-    param ([string]$message, [switch]$Error)
+    param (
+        [string]$message,
+        [switch]$Error,
+        [switch]$Warn,
+        [switch]$Success
+    )
+
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     if ($Error) {
         Write-Host "$timestamp [FEJL] $message" -ForegroundColor Red
+    } elseif ($Warn) {
+        Write-Host "$timestamp [INFO] $message" -ForegroundColor Yellow
+    } elseif ($Success) {
+        Write-Host "$timestamp [INFO] $message" -ForegroundColor Green
     } else {
         Write-Host "$timestamp [INFO] $message"
     }
@@ -45,25 +36,54 @@ function LogSummary {
         [string]$user,
         [string]$device,
         [string]$year,
-        [string]$logPath
+        [string]$logPath,
+        [switch]$Executed
     )
-    Add-Content -Path $logPath -Value ""
-    Add-Content -Path $logPath -Value "Bruger: ${user}"
-    Add-Content -Path $logPath -Value "Enhed: ${device}"
-    Add-Content -Path $logPath -Value "Summary for år ${year}:"
-    foreach ($key in $summary.Keys | Sort-Object) {
-        Add-Content -Path $logPath -Value $summary[$key]
+
+    if (!(Test-Path $logPath)) {
+        New-Item -ItemType File -Path $logPath -Force | Out-Null
     }
-    Log "Skrev summary for $user / $device til logfilen."
+
+    Add-Content -Path $logPath -Value ""
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path $logPath -Value "Run: $timestamp"
+    Add-Content -Path $logPath -Value "   $user"
+    Add-Content -Path $logPath -Value "      $device"
+
+    if ($summary.Count -eq 0) {
+        Add-Content -Path $logPath -Value "         Ingen opdateringer"
+        return
+    }
+
+    Add-Content -Path $logPath -Value "         $year"
+	foreach ($key in $summary.Keys | Sort-Object) {
+		$value = $summary[$key]
+
+		if ($key -eq "00") {
+			$content = "             Ingen billeder i $year"
+		}
+		elseif ($Executed) {
+			$content = "             $key $value er kopieret"
+		}
+		else {
+			if ($value -eq 0) {
+				$content = "             $key $value filer allerede kopieret"
+			} else {
+				$content = "             $key $value nye filer at kopiere"
+			}
+		}
+
+		Add-Content -Path $logPath -Value $content
+	}
+
+    Log "Skrev udvidet summary for $user / $device til logfilen."
 }
 
-# === Hovedloop: Find alle brugere og enheder ===
+# === Hovedloop ===
 $brugerListe = @("Tore", "Sus")
 
 foreach ($brugerNavn in $brugerListe) {
-	$brugerSti = Join-Path $baseRoot $brugerNavn
-
-    $brugerNavn = $brugerMappe.Name
+    $brugerSti = Join-Path $baseRoot $brugerNavn
     $mobileBackupPath = Join-Path $brugerSti "Photos\MobileBackup"
 
     if (!(Test-Path $mobileBackupPath)) {
@@ -75,8 +95,14 @@ foreach ($brugerNavn in $brugerListe) {
     foreach ($deviceMappe in $deviceMapper) {
         $deviceNavn = $deviceMappe.Name
         $cameraPath = Join-Path $deviceMappe.FullName "DCIM\Camera\$currentYear"
+
         if (!(Test-Path $cameraPath)) {
-            Log "Ingen billeder for $brugerNavn / $deviceNavn i $currentYear" -Error
+            Log "Ingen billeder for $brugerNavn / $deviceNavn i $currentYear" -Warn
+
+            # Log en tom summary for enheden
+            $monthSummary = @{}
+            $monthSummary["00"] = "Ingen billeder i $currentYear"
+            LogSummary -summary $monthSummary -user $brugerNavn -device $deviceNavn -year $currentYear -logPath $logFile -Executed:$Execute
             continue
         }
 
@@ -120,25 +146,23 @@ foreach ($brugerNavn in $brugerListe) {
                     $targetFile = Join-Path $destPath $image.Name
                     if (!(Test-Path $targetFile)) {
                         Log "Vil kopiere: '$($image.FullName)' til '$targetFile'"
-                        if ($Execute) {
-                            try {
-                                Copy-Item -Path $image.FullName -Destination $targetFile -Force
-                                $copiedCount++
-                            } catch {
-                                Log "Fejl ved kopiering: $_" -Error
-                            }
-                        }
+						if ($Execute) {
+							try {
+								Copy-Item -Path $image.FullName -Destination $targetFile -Force
+								$copiedCount++
+								Log "Kopierer: '$($image.FullName)' til '$targetFile'" -Success
+							} catch {
+								Log "Fejl ved kopiering: $_" -Error
+							}
+						}
+                     
                     } else {
                         Log "Springer over, da filen allerede findes: $targetFile"
                     }
                 }
 
                 $monthKey = $month.Name.PadLeft(2, '0')
-                if ($copiedCount -eq 0) {
-                    $monthSummary[$monthKey] = "$monthKey Ingen tilføjelser"
-                } else {
-                    $monthSummary[$monthKey] = "$monthKey Fandt $copiedCount nye filer"
-                }
+                $monthSummary[$monthKey] = $copiedCount
 
             } catch {
                 Log "Fejl ved behandling af måned '$($month.Name)': $_" -Error
@@ -146,8 +170,7 @@ foreach ($brugerNavn in $brugerListe) {
             }
         }
 
-        # Tilføj summary for denne bruger/enhed
-        LogSummary -summary $monthSummary -user $brugerNavn -device $deviceNavn -year $currentYear -logPath $logFile
+        LogSummary -summary $monthSummary -user $brugerNavn -device $deviceNavn -year $currentYear -logPath $logFile -Executed:$Execute
     }
 }
 
