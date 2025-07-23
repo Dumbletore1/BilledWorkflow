@@ -115,6 +115,7 @@ foreach ($brugerNavn in $brugerListe) {
         }
 
         $monthSummary = @{}
+        $seenFolders = @{}
         foreach ($month in $monthFolders) {
             try {
                 $imageFiles = Get-ChildItem -Path $month.FullName -File | Where-Object {
@@ -123,6 +124,8 @@ foreach ($brugerNavn in $brugerListe) {
                 Log "Fandt $($imageFiles.Count) filer i måned: $($month.Name)"
 
                 $copiedCount = 0
+                
+
                 foreach ($image in $imageFiles) {
                     $dateFolder = $image.CreationTime.ToString("yyyy-MM-dd")
                     $yearFolder = $image.CreationTime.Year
@@ -140,7 +143,10 @@ foreach ($brugerNavn in $brugerListe) {
                             }
                         }
                     } else {
-                        Log "Folder findes allerede: $destPath"
+                        if (-not $seenFolders.ContainsKey($destPath)) {
+                            Log "Folder findes allerede: $destPath"
+                            $seenFolders[$destPath] = $true
+                        }
                     }
 
                     $targetFile = Join-Path $destPath $image.Name
