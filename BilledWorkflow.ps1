@@ -144,21 +144,20 @@ foreach ($brugerNavn in $brugerListe) {
                     }
 
                     $targetFile = Join-Path $destPath $image.Name
-                    if (!(Test-Path $targetFile)) {
-                        Log "Vil kopiere: '$($image.FullName)' til '$targetFile'"
-						if ($Execute) {
-							try {
-								Copy-Item -Path $image.FullName -Destination $targetFile -Force
+						if (!(Test-Path $targetFile)) {
+							if ($Execute) {
+								try {
+									Copy-Item -Path $image.FullName -Destination $targetFile -Force
+									$copiedCount++
+									Log "Kopierer: '$($image.FullName)' til '$targetFile'" -Success
+								} catch {
+									Log "Fejl ved kopiering: $_" -Error
+								}
+							} else {
 								$copiedCount++
-								Log "Kopierer: '$($image.FullName)' til '$targetFile'" -Success
-							} catch {
-								Log "Fejl ved kopiering: $_" -Error
+								Log "Ny fil klar til kopiering: '$($image.FullName)' til '$targetFile'" -Warn
 							}
 						}
-                     
-                    } else {
-                        Log "Springer over, da filen allerede findes: $targetFile"
-                    }
                 }
 
                 $monthKey = $month.Name.PadLeft(2, '0')
