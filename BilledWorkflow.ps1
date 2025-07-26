@@ -1,5 +1,6 @@
 param (
-    [switch]$Execute
+    [switch]$Execute,
+    [string]$CallingProgram = "Ukendt"
 )
 
 # === Konfiguration ===
@@ -12,13 +13,13 @@ $logFile          = "$PSScriptRoot\LastRun.log"
 function Log {
     param (
         [string]$message,
-        [switch]$Error,
+        [switch]$IsError,
         [switch]$Warn,
         [switch]$Success
     )
 
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    if ($Error) {
+    if ($IsError) {
         Write-Host "$timestamp [FEJL] $message" -ForegroundColor Red
     } elseif ($Warn) {
         Write-Host "$timestamp [INFO] $message" -ForegroundColor Yellow
@@ -182,5 +183,5 @@ foreach ($brugerNavn in $brugerListe) {
 # === Log timestamp ===
 $now = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value ""
-Add-Content -Path $logFile -Value "LastRun: $now"
+Add-Content -Path $logFile -Value "LastRun: $now ($CallingProgram)"
 Log "Logget tidspunkt: $now"
