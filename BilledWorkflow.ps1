@@ -5,7 +5,7 @@ param (
 
 # === Konfiguration ===
 $baseRoot         = "\\torenas\homes"
-$destinationRoot  = "L:\Billeder\Billedbibliotek" #"J:\Pictures"
+$destinationRoot  = "L:\Billeder\Bibliotek" #"J:\Pictures"
 $currentYear      = (Get-Date).Year
 $logFile          = "$PSScriptRoot\LastRun.log"
 
@@ -128,8 +128,10 @@ foreach ($brugerNavn in $brugerListe) {
                 
 
                 foreach ($image in $imageFiles) {
-                    $dateFolder = $image.CreationTime.ToString("yyyy-MM-dd")
-                    $yearFolder = $image.CreationTime.Year
+                    #$dateFolder = $image.CreationTime.ToString("yyyy-MM-dd")
+					$dateFolder = $image.LastWriteTime.ToString("yyyy-MM-dd")
+                    #$yearFolder = $image.CreationTime.Year
+					$yearFolder = $image.LastWriteTime.Year
                     if ($yearFolder -ne $currentYear) { continue }
 
                     $destPath = Join-Path $destinationRoot "$yearFolder\$dateFolder"
