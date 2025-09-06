@@ -5,7 +5,7 @@ param (
 
 # === Konfiguration ===
 $baseRoot         = "\\torenas\homes"
-$destinationRoot  = "J:\Pictures"
+$destinationRoot  = "L:\Billeder\Billedbibliotek" #"J:\Pictures"
 $currentYear      = (Get-Date).Year
 $logFile          = "$PSScriptRoot\LastRun.log"
 
